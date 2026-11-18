@@ -1,0 +1,30 @@
+name: Mutation proposal
+description: Propose a new experiment or physics rule for the organic market.
+title: "[Mutation] "
+labels: []
+body:
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Hypothesis
+      description: What market behavior could emerge?
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-rule
+    attributes:
+      label: Proposed rule or change
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence / demo / fork URL
+      description: Link to a video, prototype or fork if available.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: The experiment uses synthetic contacts and no embedded secrets.
+          required: true
