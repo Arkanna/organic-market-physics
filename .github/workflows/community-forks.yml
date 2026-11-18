@@ -1,0 +1,44 @@
+name: Weekly public fork discovery
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * 1'
+permissions:
+  contents: read
+  issues: write
+jobs:
+  report:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect public forks and open or update report issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os,json,urllib.request,datetime
+          repo=os.environ["REPO"]; token=os.environ["GH_TOKEN"]; base="https://api.github.com"
+          def api(method,path,data=None):
+              payload=None if data is None else json.dumps(data).encode()
+              headers={"Authorization":"Bearer "+token,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","User-Agent":"organic-market-physics-fork-watch"}
+              if data is not None:headers["Content-Type"]="application/json"
+              req=urllib.request.Request(base+path,data=payload,method=method,headers=headers)
+              with urllib.request.urlopen(req,timeout=20) as res:return json.load(res)
+          forks=[]
+          for page in range(1,6):
+              batch=api("GET",f"/repos/{repo}/forks?sort=newest&per_page=100&page={page}")
+              forks.extend(batch)
+              if len(batch)<100:break
+          forks.sort(key=lambda x:x.get("pushed_at") or "",reverse=True)
+          lines=["# Organic Market Physics — Fork Evolution Report","",f"Updated {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}.","",f"Discovered {len(forks)} public forks in the first 500 returned by GitHub.","","| Fork | Last pushed (UTC) | Stars |","|---|---|---|"]
+          for f in forks[:50]:
+              lines.append(f'| [{f["full_name"]}]({f["html_url"]}) | {f.get("pushed_at") or "—"} | {f.get("stargazers_count",0)} |')
+          lines+=["","Discovery only: independent and private derivatives may be invisible. Review code manually before merging."]
+          title="Community Fork Evolution Report"; body="\n".join(lines)
+          existing=api("GET",f"/repos/{repo}/issues?state=open&per_page=100")
+          issue=next((i for i in existing if i["title"]==title and "pull_request" not in i),None)
+          if issue:api("PATCH",f'/repos/{repo}/issues/{issue["number"]}',{"body":body})
+          else:api("POST",f"/repos/{repo}/issues",{"title":title,"body":body})
+          PY
